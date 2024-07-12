@@ -38,7 +38,7 @@ class ImageDataset(Dataset):
         if self.x_transform:
           image = self.x_transform(image)
 
-        # if self.y_transform:
-        #   attributes = self.y_transform(attributes)
+        if self.y_transform:
+          attributes = self.y_transform(attributes)
 
         return image, attributes

@@ -4,7 +4,7 @@ from torch import nn
 from diffusers import DDPMScheduler
 from datetime import datetime
 import os
-from auto import tqdm
+from tqdm.auto import tqdm
 from matplotlib import pyplot as plt
 
 def get_device():
@@ -156,7 +156,7 @@ def valid_loop(net, valid_dataloader, noise_scheduler=None, loss_fn=None):
 
       # Update the step
       val_step += 1
-  return val_epoch_loss, val_epoch_loss / (val_step + 1), val_step
+  return val_epoch_loss / (val_step + 1), val_epoch_loss, val_step
 
 def gen_loop(net, gen_data, figure_path, noise_scheduler=None):
   # Get the device

@@ -42,10 +42,10 @@ class ClassConditionedUnet(nn.Module):
     
     # class conditioning in right shape to add as additional input channels
     context = self.state_emb(context) # Map to embedding dinemsion
-    context = class_cond.view(bs, context.shape[1], 1, 1).expand(bs, context.shape[1], w, h)
+    context = context.view(bs, context.shape[1], 1, 1).expand(bs, context.shape[1], w, h)
     # x is shape (bs, 1, 28, 28) and class_cond is now (bs, 4, 28, 28)
     # Net input is now x and class cond concatenated together along dimension 1
-    net_input = torch.cat((x, class_cond), 1) # (bs, 5, 28, 28)
+    net_input = torch.cat((x, context), 1) # (bs, 5, 28, 28)
 
     # Feed this to the unet alongside the timestep and return the prediction
     return self.model(net_input, t, return_dict=return_dict)
@@ -66,7 +66,7 @@ def load_class_conditional_model(image_size, context_size, emb_size):
       in_channels=1 + emb_size, # Additional input channels for class cond.
       out_channels=1,           # the number of output channels
       layers_per_block=2,       # how many ResNet layers to use per UNet block
-      block_out_channels=(32, 32, 64, 64),
+      block_out_channels=(32, 32, 64, 64, 128),
       down_block_types=(
           "DownBlock2D",        # a regular ResNet downsampling block
           "DownBlock2D",
