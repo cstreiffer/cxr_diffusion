@@ -132,10 +132,9 @@ def load_input_diffusion_model(image_size, context_size):
           "UpBlock2D",
           "UpBlock2D",
           "UpBlock2D",
-      ),
-      class_embed_type="identity"
+      )
   )
-  return InputConditionedUnet(model, context_size, n_channels=128)
+  return InputConditionedUnet(model)
 
 # Load the model state
 def load_model_state(model, path, optimizer=None):
