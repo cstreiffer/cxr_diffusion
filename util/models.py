@@ -5,26 +5,16 @@ from diffusers import UNet2DModel, UNet2DConditionModel
 class StateEmbedding(nn.Module):
     def __init__(self, n_state, out_channels):
         super().__init__()
-        self.linear_1 = nn.Linear(n_state, out_channels)
-        self.linear_2 = nn.Linear(out_channels, out_channels)
+        self.linear = nn.Sequential(
+            nn.Linear(n_state, out_channels),
+            nn.SiLU(),
+            nn.Linear(out_channels, out_channels),
+            nn.SiLU()
+        )
 
     def forward(self, x):
-        # x: (1, 9)
+        return self.linear(x)
 
-        # (1, 9) -> (1, 9)
-        x = self.linear_1(x)
-
-        # (1, 9) -> (1, 9)
-        x = nn.functional.silu(x)
-
-        # (1, 1280) -> (1, 1280)
-        x = self.linear_2(x)
-
-        # (1, 1280) -> (1, 1280)
-        x = nn.functional.silu(x)
-
-        return x
-        
 class ClassConditionedUnet(nn.Module):
   def __init__(self, model, num_inputs, emb_size):
     super().__init__()
@@ -42,7 +32,7 @@ class ClassConditionedUnet(nn.Module):
     
     # class conditioning in right shape to add as additional input channels
     context = self.state_emb(context) # Map to embedding dinemsion
-    context = context.view(bs, context.shape[1], 1, 1).expand(bs, context.shape[1], w, h)
+    context = context.view(bs, -1, 1, 1).expand(bs, -1, w, h)
     # x is shape (bs, 1, 28, 28) and class_cond is now (bs, 4, 28, 28)
     # Net input is now x and class cond concatenated together along dimension 1
     net_input = torch.cat((x, context), 1) # (bs, 5, 28, 28)
@@ -84,6 +74,33 @@ def load_class_conditional_model(image_size, context_size, emb_size):
       time_embedding_type='positional'
   )
   return ClassConditionedUnet(model, context_size, emb_size)
+
+def load_class_conditional_model_class_emb(image_size, context_size, emb_size):
+    model = UNet2DModel(
+        sample_size=image_size,
+        in_channels=1, 
+        out_channels=1, 
+        layers_per_block=3,  # Increased depth per block
+        block_out_channels=(32, 64, 64, 128, 256),  # Increased width
+        down_block_types=(
+            "DownBlock2D",
+            "DownBlock2D",
+            "AttnDownBlock2D",
+            "AttnDownBlock2D",
+            "AttnDownBlock2D",
+        ),
+        up_block_types=(
+            "AttnUpBlock2D",
+            "AttnUpBlock2D",
+            "AttnUpBlock2D",
+            "UpBlock2D",
+            "UpBlock2D",
+        ),
+        time_embedding_type='positional',  # Changed to Fourier for better performance in some cases
+        class_embed_type='timestep',
+        num_class_embeds=context_size
+    )
+    return model
 
 # Model Other - Not used
 # class_embed_type="projection"
