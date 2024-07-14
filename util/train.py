@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import torch.nn.functional as F
 import numpy as np
+import torch
 
 def generate(pipeline, seed):
   torch.manual_seed(seed)
