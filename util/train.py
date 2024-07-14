@@ -15,19 +15,19 @@ from torch import nn
 from torchvision.models import vgg16
 
 class TrainingConfig:
-    def __init__(self, image_size, context_size, context, output_dir):
+    def __init__(self, image_size, context_size, context, output_dir, batch_size=128, eval_batch_size=16, num_epochs=10, learning_rate=1e-4, save_model_epochs=1):
       self.image_size = image_size  # the generated image resolution
       self.context_size = context_size
       self.has_context = context_size > 0
       self.context = context
-      self.train_batch_size = 128
-      self.eval_batch_size = 16  # how many images to sample during evaluation
-      self.num_epochs = 10
+      self.train_batch_size = batch_size
+      self.eval_batch_size = eval_batch_size  # how many images to sample during evaluation
+      self.num_epochs = num_epochs
       self.gradient_accumulation_steps = 1
-      self.learning_rate = 1e-4
+      self.learning_rate = learning_rate
       self.lr_warmup_steps = 1000
       self.save_image_epochs = 1
-      self.save_model_epochs = 1
+      self.save_model_epochs = save_model_epochs
       self.mixed_precision = "fp16"  # `no` for float32, `fp16` for automatic mixed precision
       self.output_dir = output_dir  # the model name locally and on the HF Hub
 

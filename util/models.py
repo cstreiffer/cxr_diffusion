@@ -112,8 +112,8 @@ def load_class_diffusion_model(image_size, context_size):
 
 def load_input_diffusion_model(image_size, context_size):
   model = UNet2DModel(
-      sample_size=image_size+context_size,  # the target image resolution
-      in_channels=1,  # the number of input channels, 3 for RGB images
+      sample_size=image_size,  # the target image resolution
+      in_channels=1+context_size,  # the number of input channels, 3 for RGB images
       out_channels=1,  # the number of output channels
       layers_per_block=2,  # how many ResNet layers to use per UNet block
       block_out_channels=(128, 128, 256, 256, 512, 512),  # the number of output channels for each UNet block
@@ -147,57 +147,36 @@ def load_model_state(model, path, optimizer=None):
   loss = checkpoint['loss']
   return epoch, loss
 
-# def load_class_conditional_model(image_size, context_size, emb_size):
-#   model = UNet2DModel(
-#       sample_size=image_size,           # the target image resolution
-#       in_channels=1 + emb_size, # Additional input channels for class cond.
-#       out_channels=1,           # the number of output channels
-#       layers_per_block=2,       # how many ResNet layers to use per UNet block
-#       block_out_channels=(32, 32, 64, 64, 128),
-#       down_block_types=(
-#           "DownBlock2D",        # a regular ResNet downsampling block
-#           "DownBlock2D",
-#           "DownBlock2D",
-#           "AttnDownBlock2D",    # a ResNet downsampling block with spatial self-attention
-#           "AttnDownBlock2D",
-#       ),
-#       up_block_types=(
-#           "AttnUpBlock2D",
-#           "AttnUpBlock2D",      # a ResNet upsampling block with spatial self-attention
-#           "UpBlock2D",          # a regular ResNet upsampling block
-#           "UpBlock2D",
-#           "UpBlock2D",
-#         ),
-#       time_embedding_type='positional'
-#   )
-#   return ClassConditionedUnet(model, context_size, emb_size)
+# Load the model/pipeline
+import os
+import glob
+from diffusers import DDPMScheduler
+def load_pipeline(model_input_dir, model_type, image_size, epoch=None, context_size=0):
+  # 1. Create the scheduler
+  noise_scheduler = DDPMScheduler(num_train_timesteps=1000, beta_schedule="squaredcos_cap_v2")
 
-# def load_class_conditional_model_class_emb(image_size, context_size, emb_size):
-#     model = UNet2DModel(
-#         sample_size=image_size,
-#         in_channels=1, 
-#         out_channels=1, 
-#         layers_per_block=3,  # Increased depth per block
-#         block_out_channels=(32, 64, 64, 128, 256),  # Increased width
-#         down_block_types=(
-#             "DownBlock2D",
-#             "DownBlock2D",
-#             "AttnDownBlock2D",
-#             "AttnDownBlock2D",
-#             "AttnDownBlock2D",
-#         ),
-#         up_block_types=(
-#             "AttnUpBlock2D",
-#             "AttnUpBlock2D",
-#             "AttnUpBlock2D",
-#             "UpBlock2D",
-#             "UpBlock2D",
-#         ),
-#         time_embedding_type='positional',  # Changed to Fourier for better performance in some cases
-#         class_embed_type='timestep',
-#         num_class_embeds=context_size
-#     )
-#     return model
+  # 2. Create the model
+  if model_type == 'basic_diffusion':
+    model = load_basic_diffusion_model(image_size)
+  elif model_type == 'class_diffusion':
+    model = load_class_diffusion_model(image_size, context_size)
+  elif model_type == 'input_diffusion':
+    model = load_input_diffusion_model(image_size, context_size)
+
+  # 3. Find the correct model
+  files = glob.glob(os.path.join(model_input_dir, "models_pth", "*.pth"))
+  if epoch is None:
+    epoch = max([int(os.path.basename(n).split('_')[3]) for n in files])
+
+  # 4. Get the correct model
+  file = list(filter(lambda x: int(os.path.basename(x).split('_')[3]) == epoch, files))[0]
+  print(f"Loaded {file}")
+  
+  # Now load
+  _, _ = load_model_state(model, file)
+
+  # Now return
+  return model, noise_scheduler
 
 # Model Other - Not used
 # class_embed_type="projection"
