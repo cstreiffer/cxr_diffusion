@@ -8,28 +8,63 @@ import os
 import torch.nn.functional as F
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
+import torchvision 
+from datetime import datetime
+from torch import nn
+from torchvision.models import vgg16
 
-def generate(pipeline, seed):
+class TrainingConfig:
+    def __init__(self, image_size, context_size, context, output_dir):
+      self.image_size = image_size  # the generated image resolution
+      self.context_size = context_size
+      self.has_context = context_size > 0
+      self.context = context
+      self.train_batch_size = 128
+      self.eval_batch_size = 16  # how many images to sample during evaluation
+      self.num_epochs = 10
+      self.gradient_accumulation_steps = 1
+      self.learning_rate = 1e-4
+      self.lr_warmup_steps = 1000
+      self.save_image_epochs = 1
+      self.save_model_epochs = 1
+      self.mixed_precision = "fp16"  # `no` for float32, `fp16` for automatic mixed precision
+      self.output_dir = output_dir  # the model name locally and on the HF Hub
+
+      self.push_to_hub = False  # whether to upload the saved model to the HF Hub
+      self.seed = 17
+      self.overwrite_output_dir = True
+      # self.hub_model_id = "<your-username>/<my-awesome-model>"  # the name of the repository to create on the HF Hub
+      # self.hub_private_repo = False
+
+def get_device():
+    device = 'mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu'
+    return device
+
+def generate(net, noise_scheduler, image_size, batch_size=16, seed=17, context=None, show_image=False):
   torch.manual_seed(seed)
-  noise_scheduler = pipeline.scheduler
-  net = pipeline.unet
-  bs = 16
-  x = torch.randn(bs, 1, size, size).to('cuda')
+  # noise_scheduler = pipeline.scheduler
+  # net = pipeline.unet
+  x = torch.randn(batch_size, 1, image_size, image_size).to(get_device())
 
   # Sampling loop
   for i, t in tqdm(enumerate(noise_scheduler.timesteps)):
 
       # Get model pred
       with torch.no_grad():
-          residual = net(x, t, return_dict=False)  # Again, note that we pass in our labels y
-
+          if context is not None:
+              residual = net(x, t, class_labels=context, return_dict=False)  # Again, note that we pass in our labels y
+          else:
+            residual = net(x, t, return_dict=False)
       # Update sample with step
       x = noise_scheduler.step(residual[0], t, x).prev_sample
 
   # Show the results
-  fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-  ax.grid(False)
-  ax.imshow(torchvision.utils.make_grid(x.detach().cpu().clip(-1, 1), nrow=4)[0], cmap='Greys')
+  if show_image:
+      fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+      ax.grid(False)
+      ax.imshow(torchvision.utils.make_grid(x.detach().cpu().clip(-1, 1), nrow=4)[0], cmap='Greys')
+  
   return x
 
 def evaluate(config, step, pipeline):
@@ -39,15 +74,44 @@ def evaluate(config, step, pipeline):
     #     batch_size=config.eval_batch_size,
     #     generator=torch.Generator(device='cpu').manual_seed(config.seed), # Use a separate torch generator to avoid rewinding the random state of the main training loop
     # ).images
-    images = generate(pipeline, config.seed)
+    images = generate(pipeline.unet, pipeline.scheduler, config.image_size, batch_size=16, seed=config.seed, context=config.context)
 
     # Make a grid out of the images
-    image_grid = make_image_grid(images, rows=4, cols=4, resize=64)
+    # image_grid = make_image_grid(images, rows=4, cols=4, resize=config.image_size*2)
+    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+    ax.grid(False)
+    ax.imshow(torchvision.utils.make_grid(images.detach().cpu().clip(-1, 1), nrow=4)[0], cmap='Greys')
 
     # Save the images
     test_dir = os.path.join(config.output_dir, "samples")
     os.makedirs(test_dir, exist_ok=True)
-    image_grid.save(f"{test_dir}/sample_{step:08d}.png")
+    plt.savefig(f"{test_dir}/sample_{step:08d}.png")
+
+class PerceptualLoss(nn.Module):
+    def __init__(self, feature_extractor, mse_weight=1.0, perceptual_weight=0.05):
+        super().__init__()
+        self.mse_loss = nn.MSELoss()
+        self.perceptual_weight = perceptual_weight
+        self.mse_weight = mse_weight
+        self.feature_extractor = feature_extractor
+        for param in self.feature_extractor.parameters():
+            param.requires_grad = False
+
+    def forward(self, pred, target):
+        # Ensure input is three-channel by repeating grayscale image across three channels
+        pred_rgb = pred.repeat(1, 3, 1, 1)
+        target_rgb = target.repeat(1, 3, 1, 1)
+
+        mse_loss = self.mse_loss(pred, target)
+        perceptual_loss = self.mse_loss(self.feature_extractor(pred_rgb), self.feature_extractor(target_rgb))
+        return self.mse_weight * mse_loss + self.perceptual_weight * perceptual_loss
+
+# Initialize a feature extractor for Perceptual Loss
+feature_extractor = vgg16(pretrained=True).features[:16].eval().to(get_device())
+
+# Usage example:
+# loss_fn = PerceptualLoss(feature_extractor)
+# loss = loss_fn(predictions, ground_truth_images)
 
 def train(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler):
     # Initialize accelerator and tensorboard logging
@@ -100,7 +164,11 @@ def train(config, model, noise_scheduler, optimizer, train_dataloader, lr_schedu
 
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                noise_pred = model(noisy_images, timesteps, return_dict=False)[0]
+                if config.has_context:
+                    context = batch[1]
+                    noise_pred = model(noisy_images, timesteps, class_labels=context, return_dict=False)[0]
+                else:
+                    noise_pred = model(noisy_images, timesteps, return_dict=False)[0]
                 loss = F.mse_loss(noise_pred, noise)
                 accelerator.backward(loss)
 
@@ -144,14 +212,14 @@ def train(config, model, noise_scheduler, optimizer, train_dataloader, lr_schedu
                   'loss': epoch_loss,
               }, checkpoint_filename)
 
-            if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
-                if config.push_to_hub:
-                    upload_folder(
-                        repo_id=repo_id,
-                        folder_path=config.output_dir,
-                        commit_message=f"Epoch {epoch}",
-                        ignore_patterns=["step_*", "epoch_*"],
-                    )
-                else:
-                    pipeline.save_pretrained(config.output_dir)
+            # if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
+            #     if config.push_to_hub:
+            #         upload_folder(
+            #             repo_id=repo_id,
+            #             folder_path=config.output_dir,
+            #             commit_message=f"Epoch {epoch}",
+            #             ignore_patterns=["step_*", "epoch_*"],
+            #         )
+            #     else:
+            #         pipeline.save_pretrained(config.output_dir)
     return model, train_loss, tot_epoch_loss
