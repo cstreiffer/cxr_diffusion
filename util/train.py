@@ -108,11 +108,13 @@ def evaluate(config, step, pipeline):
 def validate(config, net, noise_scheduler, valid_dataloader, loss_fn):
     valid_loss = []
     for step, batch in enumerate(valid_dataloader):
-        clean_images = batch[0]
+        clean_images = batch[0].to(get_device())
 
         # Sample noise to add to the images
         noise = torch.randn(clean_images.shape, device=clean_images.device)
         bs = clean_images.shape[0]
+
+        print("Here", clean_images.device)
 
         # Sample a random timestep for each image
         timesteps = torch.randint(
@@ -125,7 +127,7 @@ def validate(config, net, noise_scheduler, valid_dataloader, loss_fn):
         with torch.no_grad():
             # Predict the noise residual
             if config.has_context:
-                context = batch[1]
+                context = batch[1].to(get_device())
                 noise_pred = net(noisy_images, timesteps, class_labels=context, return_dict=False)[0]
             else:
                 noise_pred = net(noisy_images, timesteps, return_dict=False)[0]
@@ -215,7 +217,7 @@ def train(config, model, noise_scheduler, optimizer, train_dataloader, lr_schedu
 
         # Now compute the validation loss
         if valid_dataloader is not None:
-            val_epoch_loss, vl  = validate(config, scheduler.unet, noise_scheduler, valid_dataloader, loss_fn)
+            val_epoch_loss, vl  = validate(config, accelerator.unwrap_model(model), noise_scheduler, valid_dataloader, loss_fn)
             tot_val_loss.append(val_epoch_loss)
             valid_loss.extend(vl)
 
