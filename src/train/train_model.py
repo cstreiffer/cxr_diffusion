@@ -1,18 +1,18 @@
 import torch
+import torchvision 
+import torch.nn.functional as F
+from torchvision.utils import make_grid
 from diffusers import DDPMPipeline
 from diffusers.utils import make_image_grid
 from accelerate import Accelerator
+import numpy as np
+import pandas as pd
 from huggingface_hub import create_repo, upload_folder
 from tqdm.auto import tqdm
 from pathlib import Path
-import os
-import torch.nn.functional as F
-import numpy as np
-import pandas as pd
-import torch
 from matplotlib import pyplot as plt
-import torchvision 
 from datetime import datetime
+import os
 
 def train_model(
     model,
@@ -39,6 +39,8 @@ def train_model(
             os.makedirs(args.model_output_path, exist_ok=True)
             models_dir = os.path.join(args.model_output_path, "models_pth")
             os.makedirs(models_dir, exist_ok=True)
+            samples_dir = os.path.join(args.model_output_path, "samples")
+            os.makedirs(samples_dir, exist_ok=True)
 
         if args.push_to_hub:
             repo_id = create_repo(
@@ -108,7 +110,7 @@ def train_model(
             
         return eval_loss, np.mean(eval_loss), np.sum(eval_loss)
 
-    def generate_eval_step():
+    def generate_eval_step(save_image=True):
         model.eval()
 
         # Copy the x
@@ -129,6 +131,27 @@ def train_model(
 
         # Now return the x and images
         loss = loss_fn(x, clean_images)
+
+        # Prepare images for saving
+        generated_images = x.detach().cpu().clip(-1, 1)
+        clean_images = clean_images.detach().cpu().clip(-1, 1)
+
+        # Create grids of images
+        if save_image:
+            generated_grid = make_grid(generated_images, nrow=4, padding=2, pad_value=1)
+            clean_grid = make_grid(clean_images, nrow=4, padding=2, pad_value=1)
+
+            # Concatenate grids horizontally
+            combined_grid = torch.cat((generated_grid, clean_grid), dim=-1)  # Concatenate along width
+
+            # Plotting
+            plt.figure(figsize=(8, 4))  # Adjust size to accommodate both grids
+            plt.imshow(combined_grid.permute(1, 2, 0))  # Permute tensor to image format for matplotlib
+            plt.axis('off')  # Hide axes
+
+            # Save the image
+            plt.savefig(f"{samples_dir}/sample_{step:08d}.png", bbox_inches='tight', pad_inches=0.5)
+            plt.close()
 
         return x, clean_images, loss.item().detach()
 
