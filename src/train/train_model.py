@@ -19,7 +19,7 @@ def train_model(
     model_output_path,
     dataloader_train,
     dataloader_eval,
-    dataloader_test,
+    dataloader_sample,
     num_epochs,
     optimizer,
     noise_scheduler,
@@ -32,29 +32,30 @@ def train_model(
         mixed_precision=args.mixed_precision,
         gradient_accumulation_steps=args.accumulate_grads_every_x_steps,
         log_with="tensorboard",
-        project_dir=os.path.join(args.model_output_path, "logs"),
+        project_dir=os.path.join(model_output_path, "logs"),
     )
     if accelerator.is_main_process:
-        if args.model_output_path is not None:
-            os.makedirs(args.model_output_path, exist_ok=True)
-            models_dir = os.path.join(args.model_output_path, "models_pth")
+        if model_output_path is not None:
+            os.makedirs(model_output_path, exist_ok=True)
+            models_dir = os.path.join(model_output_path, "models_pth")
             os.makedirs(models_dir, exist_ok=True)
-            samples_dir = os.path.join(args.model_output_path, "samples")
+            samples_dir = os.path.join(model_output_path, "samples")
             os.makedirs(samples_dir, exist_ok=True)
 
         if args.push_to_hub:
             repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(args.model_output_path).name, exist_ok=True
+                repo_id=args.hub_model_id or Path(model_output_path).name, exist_ok=True
             ).repo_id
         accelerator.init_trackers("train_example")
 
-    # Prepare the context for evaluation
-    eval_noise = torch.randn(args.gen_eval_batch_size)
-    eval_indices = torch.randint(0, len(dataloader_eval), (args.gen_eval_batch_size,))
-
     # Prepare the objects
-    model, optimizer, dataloader_train, dataloader_eval, eval_noise, eval_indices, lr_scheduler = accelerator.prepare(
-        model, optimizer, dataloader_train, dataloader_eval, eval_noise, eval_indices, lr_scheduler
+    model, optimizer, dataloader_train, dataloader_eval, dataloader_sample, lr_scheduler = accelerator.prepare(
+        model, 
+        optimizer, 
+        dataloader_train, 
+        dataloader_eval,
+        dataloader_sample, 
+        lr_scheduler
     )
 
     def train_step(batch):
@@ -81,7 +82,12 @@ def train_model(
             loss = loss_fn(noise_pred, noise)
             accelerator.backward(loss)
 
-        return loss.item().detach()
+            accelerator.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.zero_grad()
+
+        return loss.item()
 
     def eval_full():
         model.eval()
@@ -106,18 +112,19 @@ def train_model(
                 context = batch[1]
                 noise_pred = model(noisy_images, timesteps, context, return_dict=False)[0]
                 loss = loss_fn(noise_pred, noise)
-            eval_loss.append(loss.item().detach())
+            eval_loss.append(loss.item())
             
         return eval_loss, np.mean(eval_loss), np.sum(eval_loss)
 
-    def generate_eval_step(save_image=True):
+    def generate_eval_step(step, save_image=True):
         model.eval()
 
-        # Copy the x
-        x = eval_noise.clone().detach() 
-
         # Now get the context and images
-        clean_images, eval_context = dataloader_eval[eval_indices]
+        clean_images, eval_context = next(iter(dataloader_sample))
+
+        # Generate the noise
+        torch.manual_seed(args.seed)
+        x = torch.randn(clean_images.shape, device=clean_images.device)
 
         # Sampling loop
         for i, t in tqdm(enumerate(noise_scheduler.timesteps)):
@@ -153,7 +160,7 @@ def train_model(
             plt.savefig(f"{samples_dir}/sample_{step:08d}.png", bbox_inches='tight', pad_inches=0.5)
             plt.close()
 
-        return x, clean_images, loss.item().detach()
+        return x, clean_images, loss.item()
 
     # Now let's iterate
     global_step = 1
@@ -163,14 +170,7 @@ def train_model(
         "eval_loss": [],
         "gen_eval_loss": []
     }
-    display_stats = {
-        "A - Batch Loss": 0,
-        "B - Avg Loss": 0,
-        "C - Epoch Loss": 0,
-        "D - Val Loss": 0,
-        "E - Gen Eval Loss": 0,
-        "F - LR": 0,
-    }
+    display_stats = {}
 
     for epoch in range(args.num_epochs):
         progress_bar = tqdm(total=len(dataloader_train), disable=not accelerator.is_local_main_process)
@@ -181,13 +181,17 @@ def train_model(
             batch_loss = train_step(batch)
 
             # Update loss
+            progress_bar.update(1)
             epoch_loss += batch_loss
             all_stats["train_loss"].append(batch_loss)
             display_stats["A - Batch Loss"] = batch_loss
             display_stats["B - Avg Loss"] = np.mean(all_stats["train_loss"][-1000:])
+            display_stats["G - Global Step"] = global_step
+            display_stats["F - LR"] = lr_scheduler.get_last_lr()[0]
+            global_step += 1
 
             # Now determine if we should eval
-            if global_step % args.eval_metrics_every_x_batches:
+            if global_step % args.eval_metrics_every_x_batches == 0:
                 # Run eval
                 eval_loss, mean_eval_loss, total_eval_loss = eval_full()
 
@@ -195,25 +199,27 @@ def train_model(
                 all_stats["eval_loss"].append(mean_eval_loss)
                 display_stats["D - Val Loss"] = mean_eval_loss
 
-            if global_step % args.gen_eval_every_x_batches:
+            if global_step % args.gen_eval_every_x_batches == 0:
                 # Run gen eval
-                gen_images, clean_images, gen_eval_loss = generate_eval_step()
+                gen_images, clean_images, gen_eval_loss = generate_eval_step(global_step)
 
                 # Update stats
-                all_stats["gen_eval_loss"].append(mean_eval_loss)
-                display_stats["E - Gen Eval Loss"] = mean_eval_loss
+                all_stats["gen_eval_loss"].append(gen_eval_loss)
+                display_stats["E - Gen Eval Loss"] = gen_eval_loss
 
             # Increment the global_step
-            global_step += 1
+
             progress_bar.set_postfix(**display_stats)
             accelerator.log(display_stats, step=global_step)
 
         # Now update
         all_stats["train_epoch_loss"].append(epoch_loss / (step+1))
-        display_stats["C - Epoch Loss"] = np.mean(all_stats["epoch_loss"][-1000:])
+        display_stats["C - Epoch Loss"] = np.mean(all_stats["train_epoch_loss"][-1])
 
         if accelerator.is_main_process:
             if (epoch + 1) % args.save_model_epochs == 0 or epoch == args.num_epochs - 1:
+
+                # Save the model with the latest eval
                 eval_loss, mean_eval_loss, total_eval_loss = eval_full()
                 checkpoint_filename = f'{models_dir}/diffusion_checkpoint_epoch_{epoch}_{datetime.now().strftime("%Y-%m-%d")}_loss={mean_eval_loss}.pth'
                 torch.save({
@@ -222,3 +228,10 @@ def train_model(
                   'optimizer_state_dict': optimizer.state_dict(),
                   'eval_loss': mean_eval_loss,
                 }, checkpoint_filename)
+
+                # Save the training stats
+                checkpoint_stats_filename = f'{models_dir}/diffusion_checkpoint_stats.pth'
+                torch.save({
+                    "train_stats": all_stats,
+                    "args": args,
+                }, checkpoint_stats_filename)

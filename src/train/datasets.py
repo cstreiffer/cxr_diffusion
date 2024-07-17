@@ -35,6 +35,12 @@ class CXRDiffusionDataset(Dataset):
         self.age_stats = age_stats
         self.downsample_size = downsample_size
 
+        # Create the transform
+        self.transform = transforms.Compose([
+            transforms.Resize((downsample_size, downsample_size)),
+            transforms.ToTensor(),
+        ])
+
         if age_stats is None:
             self.age_mean = self.metadata["age"].mean()
             self.age_var = self.metadata["age"].var()
@@ -55,22 +61,19 @@ class CXRDiffusionDataset(Dataset):
         path = image_metadata["file_path"]
 
         try:
-            image_array = [cv2.imread(path)[:, :, 0]]
+            image = Image.open(path)
         except:
             print("Error in reading file {}".format(path))
             return None
 
-        # Downsample as needed
-        image_array = [
-            zoom_2D(im_arr, (self.downsample_size, self.downsample_size))
-            for im_arr in image_array
-        ]
-        image_array = [torch.from_numpy(ds).float() for ds in image_array]
-        image_array = torch.stack(image_array)
+        # Apply the transform
+        image = self.transform(image)
 
+        # Load the context
         context = torch.from_numpy(image_metadata[self.label_cols].values.astype(np.float32))
 
-        return image_array, context
+        # Now return
+        return image, context
 
 
 class CXRInferenceDataset(Dataset):

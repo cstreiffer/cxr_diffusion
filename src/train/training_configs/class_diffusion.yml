@@ -1,6 +1,7 @@
 model_name: "input_diffusion"
 model_output_path: "drive/MyDrive/cxr/models/"
 mixed_precision: "fp16"
+seed: 17
 dataset_settings:
   # binary labels
   label_cols:

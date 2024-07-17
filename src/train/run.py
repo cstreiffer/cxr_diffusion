@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch import nn
 from datasets import (
     CXRDiffusionDataset,
@@ -18,6 +18,9 @@ from diffusers import DDPMScheduler
 from train_model import train_model
 import os
 from datetime import datetime
+from argparse import Namespace
+import yaml
+import random
 
 def run(args):
     if(args.cuda_idx >= 0) and torch.cuda.is_available():
@@ -30,8 +33,8 @@ def run(args):
     args.device = device
 
     # Define the output path
-    args.model_output_path = os.path.join(
-        args.model_output_path, 
+    model_output_path = os.path.join(
+        args.model_output_path,
         f'{args.model_name}_{args.dataset_settings["downsample_size"]}_{datetime.now().strftime("%Y-%m-%d")}'
     )
 
@@ -63,8 +66,7 @@ def run(args):
         dataset_train.age_var,
     )
     dataset_eval = dset_class(**args.eval_dataset_settings)
-    dataset_test = dset_class(**args.test_dataset_settings)
-
+    # dataset_test = dset_class(**args.test_dataset_settings)
     dataloader_train = DataLoader(
         dataset_train,
         args.batch_size,
@@ -81,9 +83,12 @@ def run(args):
         **dataloader_kwargs
     )
 
-    dataloader_test = DataLoader(
-        dataset_test,
-        args.batch_size,
+    # Create the random sample
+    random.seed(args.seed)
+    idx = random.sample(range(1, len(dataset_eval) + 1), args.gen_eval_batch_size)
+    dataloader_sample = DataLoader(
+        Subset(dataset_eval, idx),
+        args.gen_eval_batch_size,
         shuffle=False,
         collate_fn=collate_cxr,
         **dataloader_kwargs
@@ -127,3 +132,25 @@ def run(args):
         loss_fn = nn.MSELoss()
     elif args.loss_fn == 'mse_p':
         loss_fn = perceptual_loss()
+
+    metrics = train_model(
+        model,
+        model_output_path,
+        dataloader_train,
+        dataloader_eval,
+        dataloader_sample,
+        args.num_epochs,
+        optimizer,
+        noise_scheduler,
+        lr_scheduler,
+        loss_fn,
+        args
+    )
+
+    return metrics
+
+def load_file(config_file):
+    with open(config_file, 'r') as f_in:
+        config_dict = yaml.safe_load()
+    args = Namespace(**config_dict)
+    return args
