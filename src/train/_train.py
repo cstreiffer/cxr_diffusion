@@ -12,59 +12,10 @@ from matplotlib import pyplot as plt
 import torchvision 
 from datetime import datetime
 from torch import nn
-from torchvision.models import vgg16
-
-class TrainingConfig:
-    def __init__(self, image_size, context_size, context, output_dir, batch_size=128, eval_batch_size=16, num_epochs=10, learning_rate=1e-4, save_model_epochs=1):
-      self.image_size = image_size  # the generated image resolution
-      self.context_size = context_size
-      self.has_context = context_size > 0
-      self.context = context
-      self.train_batch_size = batch_size
-      self.eval_batch_size = eval_batch_size  # how many images to sample during evaluation
-      self.num_epochs = num_epochs
-      self.gradient_accumulation_steps = 1
-      self.learning_rate = learning_rate
-      self.lr_warmup_steps = 1000
-      self.save_image_epochs = 1
-      self.save_model_epochs = save_model_epochs
-      self.mixed_precision = "fp16"  # `no` for float32, `fp16` for automatic mixed precision
-      self.output_dir = output_dir  # the model name locally and on the HF Hub
-
-      self.push_to_hub = False  # whether to upload the saved model to the HF Hub
-      self.seed = 17
-      self.overwrite_output_dir = True
-      # self.hub_model_id = "<your-username>/<my-awesome-model>"  # the name of the repository to create on the HF Hub
-      # self.hub_private_repo = False
 
 def get_device():
     device = 'mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu'
     return device
-
-class PerceptualLoss(nn.Module):
-    def __init__(self, feature_extractor, mse_weight=1.0, perceptual_weight=0.05):
-        super().__init__()
-        self.mse_loss = nn.MSELoss()
-        self.perceptual_weight = perceptual_weight
-        self.mse_weight = mse_weight
-        self.feature_extractor = feature_extractor
-        for param in self.feature_extractor.parameters():
-            param.requires_grad = False
-
-    def forward(self, pred, target):
-        # Ensure input is three-channel by repeating grayscale image across three channels
-        pred_rgb = pred.repeat(1, 3, 1, 1)
-        target_rgb = target.repeat(1, 3, 1, 1)
-
-        mse_loss = self.mse_loss(pred, target)
-        perceptual_loss = self.mse_loss(self.feature_extractor(pred_rgb), self.feature_extractor(target_rgb))
-        return self.mse_weight * mse_loss + self.perceptual_weight * perceptual_loss
-
-# Alternate loss
-def perceptual_loss():
-    # Initialize a feature extractor for Perceptual Loss
-    feature_extractor = vgg16(pretrained=True).features[:16].eval().to(get_device())
-    return PerceptualLoss(feature_extractor)
 
 def generate(net, noise_scheduler, image_size, batch_size=16, seed=17, context=None, show_image=False):
   if seed > 0:
