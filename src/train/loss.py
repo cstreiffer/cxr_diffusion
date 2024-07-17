@@ -1,5 +1,10 @@
+import torch
 from torch import nn
 from torchvision.models import vgg16
+
+def get_device():
+    device = 'mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu'
+    return device
 
 class PerceptualLoss(nn.Module):
     def __init__(self, feature_extractor, mse_weight=1.0, perceptual_weight=0.05):

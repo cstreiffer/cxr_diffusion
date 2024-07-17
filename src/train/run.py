@@ -2,7 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 from torch import nn
 from datasets import (
-    CXRDiffusionDataset
+    CXRDiffusionDataset,
+    collate_cxr
 )
 from models import (
     load_input_diffusion_model,
@@ -15,6 +16,8 @@ from loss import (
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from diffusers import DDPMScheduler
 from train_model import train_model
+import os
+from datetime import datetime
 
 def run(args):
     if(args.cuda_idx >= 0) and torch.cuda.is_available():
@@ -27,7 +30,10 @@ def run(args):
     args.device = device
 
     # Define the output path
-    args.model_output_path = os.path.join(model_output_path, f"{args.model_name}_{args.dataset_settings.downsample_size}_{datetime.now().strftime("%Y-%m-%d")}")
+    args.model_output_path = os.path.join(
+        args.model_output_path, 
+        f'{args.model_name}_{args.dataset_settings["downsample_size"]}_{datetime.now().strftime("%Y-%m-%d")}'
+    )
 
     # Load the datasets
     args.train_dataset_settings = args.dataset_settings.copy()
@@ -86,11 +92,11 @@ def run(args):
     # Load the model
     model = None
     if args.model_name == "basic_diffusion":
-        model = load_basic_diffusion_model()
+        model = load_basic_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
     elif args.model_name == "class_diffusion":
-        model = load_class_diffusion_model()
+        model = load_class_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
     elif args.model_name == "input_diffusion":
-        model = load_input_diffusion_model()
+        model = load_input_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
 
     # Place the model
     model = model.to(device)
@@ -119,19 +125,5 @@ def run(args):
     # Define the loss function
     if args.loss_fn == 'mse':
         loss_fn = nn.MSELoss()
-    else:
+    elif args.loss_fn == 'mse_p':
         loss_fn = perceptual_loss()
-
-    metrics = train_model(
-        model,
-        args.model_output_path,
-        dataloader_train,
-        dataloader_eval,
-        dataloader_test,
-        args.num_epochs,
-        optimizer,
-        noise_scheduler,
-        lr_scheduler,
-        loss_fn,
-        args
-    )

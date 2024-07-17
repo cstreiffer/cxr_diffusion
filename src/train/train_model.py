@@ -17,7 +17,6 @@ from datetime import datetime
 def train_model(
     model,
     model_output_path,
-    noise_scheduler,
     dataloader_train,
     dataloader_eval,
     dataloader_test,
@@ -41,7 +40,7 @@ def train_model(
             models_dir = os.path.join(args.model_output_path, "models_pth")
             os.makedirs(models_dir, exist_ok=True)
 
-        if config.push_to_hub:
+        if args.push_to_hub:
             repo_id = create_repo(
                 repo_id=args.hub_model_id or Path(args.model_output_path).name, exist_ok=True
             ).repo_id
@@ -49,11 +48,11 @@ def train_model(
 
     # Prepare the context for evaluation
     eval_noise = torch.randn(args.gen_eval_batch_size)
-    eval_indices = torch.randint(0, len(valid_dataloader), (args.gen_eval_batch_size,))
+    eval_indices = torch.randint(0, len(dataloader_eval), (args.gen_eval_batch_size,))
 
     # Prepare the objects
-    model, optimizer, train_dataloader, valid_dataloader, eval_noise, eval_indices, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_dataloader, valid_dataloader, eval_context, eval_noise, lr_scheduler
+    model, optimizer, dataloader_train, dataloader_eval, eval_noise, eval_indices, lr_scheduler = accelerator.prepare(
+        model, optimizer, dataloader_train, dataloader_eval, eval_noise, eval_indices, lr_scheduler
     )
 
     def train_step(batch):
@@ -76,7 +75,7 @@ def train_model(
 
         with accelerator.accumulate(model):
             context = batch[1]
-            noise_pred = model(noisy_images, timesteps, class_labels=context, return_dict=False)[0]
+            noise_pred = model(noisy_images, timesteps, context, return_dict=False)[0]
             loss = loss_fn(noise_pred, noise)
             accelerator.backward(loss)
 
@@ -86,8 +85,8 @@ def train_model(
         model.eval()
         eval_loss = []
 
-        for step, batch in enumerate(tqdm(valid_dataloader)):
-            clean_images = batch[0].to(get_device())
+        for step, batch in enumerate(tqdm(dataloader_eval)):
+            clean_images = batch[0]
 
             # Sample noise to add to the images
             noise = torch.randn(clean_images.shape, device=clean_images.device)
@@ -103,7 +102,7 @@ def train_model(
             noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
             with torch.no_grad():
                 context = batch[1]
-                noise_pred = model(noisy_images, timesteps, class_labels=context, return_dict=False)[0]
+                noise_pred = model(noisy_images, timesteps, context, return_dict=False)[0]
                 loss = loss_fn(noise_pred, noise)
             eval_loss.append(loss.item().detach())
             
@@ -116,14 +115,14 @@ def train_model(
         x = eval_noise.clone().detach() 
 
         # Now get the context and images
-        clean_images, context = valid_dataloader[eval_indices]
+        clean_images, eval_context = dataloader_eval[eval_indices]
 
         # Sampling loop
         for i, t in tqdm(enumerate(noise_scheduler.timesteps)):
 
             # Get model pred
             with torch.no_grad():
-                residual = model(x, t, class_labels=eval_context, return_dict=False)  # Again, note that we pass in our labels y
+                residual = model(x, t, context=eval_context, return_dict=False)  # Again, note that we pass in our labels y
 
             # Update sample with step
             x = noise_scheduler.step(residual[0], t, x).prev_sample
@@ -151,10 +150,10 @@ def train_model(
     }
 
     for epoch in range(args.num_epochs):
-        progress_bar = tqdm(total=len(train_dataloader), disable=not accelerator.is_local_main_process)
+        progress_bar = tqdm(total=len(dataloader_train), disable=not accelerator.is_local_main_process)
         progress_bar.set_description(f"Epoch {epoch}")
         epoch_loss = 0
-        for step, batch in enumerate(train_dataloader):
+        for step, batch in enumerate(dataloader_train):
             # Take a train step
             batch_loss = train_step(batch)
 

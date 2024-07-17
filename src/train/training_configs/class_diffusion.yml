@@ -1,4 +1,4 @@
-model_name: "class_diffusion"
+model_name: "input_diffusion"
 model_output_path: "drive/MyDrive/cxr/models/"
 mixed_precision: "fp16"
 dataset_settings:
@@ -22,6 +22,7 @@ num_feats: 8
 batch_size: 128
 gen_eval_batch_size: 16
 num_epochs: 10
+loss_fn: mse_p
 optimizer: adamw
 optimizer_kwargs:
   lr: 0.0005

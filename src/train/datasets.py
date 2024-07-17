@@ -33,6 +33,7 @@ class CXRDiffusionDataset(Dataset):
         self.label_cols = label_cols
         self.train = train
         self.age_stats = age_stats
+        self.downsample_size = downsample_size
 
         if age_stats is None:
             self.age_mean = self.metadata["age"].mean()
@@ -67,8 +68,7 @@ class CXRDiffusionDataset(Dataset):
         image_array = [torch.from_numpy(ds).float() for ds in image_array]
         image_array = torch.stack(image_array)
 
-        context = image_metadata[self.label_cols]
-        context = torch.tensor(context)
+        context = torch.from_numpy(image_metadata[self.label_cols].values.astype(np.float32))
 
         return image_array, context
 
