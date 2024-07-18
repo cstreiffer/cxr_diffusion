@@ -22,8 +22,8 @@ dataset_settings:
     - lvidd
 metadata_df_paths:
   train_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_train.csv
-  eval_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_test.csv
-  test_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_eval.csv
+  eval_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_eval.csv
+  test_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_test.csv
 num_feats: 8
 batch_size: 32
 gen_eval_batch_size: 16

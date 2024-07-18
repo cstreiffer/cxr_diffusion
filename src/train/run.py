@@ -146,6 +146,6 @@ def run(args):
 
 def load_file(config_file):
     with open(config_file, 'r') as f_in:
-        config_dict = yaml.safe_load()
+        config_dict = yaml.safe_load(f_in)
     args = Namespace(**config_dict)
     return args

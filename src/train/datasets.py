@@ -36,7 +36,7 @@ class CXRDiffusionDataset(Dataset):
         self.label_cols = label_cols
         self.train = train
         self.age_stats = age_stats
-        self.cont_feats_stats = cont_feats_stats
+        self.cont_feat_stats = cont_feat_stats
         self.downsample_size = downsample_size
 
         # Create the transform

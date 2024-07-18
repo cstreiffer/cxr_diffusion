@@ -142,7 +142,8 @@ def load_class_diffusion_model_large(image_size, context_size):
           "AttnUpBlock2D",
           "AttnUpBlock2D",
           "UpBlock2D",
-      )      class_embed_type="identity"
+      ),
+      class_embed_type="identity"
   )
   return ClassConditionedUnet(model, context_size, n_channels=128)
 
