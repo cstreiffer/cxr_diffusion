@@ -34,7 +34,7 @@ class ClassConditionedUnet(nn.Module):
     context = self.state_emb(context) # Map to embedding dinemsion
 
     # Feed this to the unet alongside the timestep and return the prediction
-    return self.model(x, t, context=context, return_dict=return_dict)
+    return self.model(x, t, class_labels=context, return_dict=return_dict)
 
 class InputConditionedUnet(nn.Module):
   def __init__(self, model):
