@@ -13,7 +13,7 @@ dataset_settings:
   - ivsd
   - lvpwd
   - lvidd
-  downsample_size: 128
+  downsample_size: 224
   train: true
   norm_cont_feat: true
   cont_feat_labels:
@@ -39,7 +39,7 @@ noise_scheduler_kwargs:
 cuda_idx: 0
 accumulate_grads_every_x_steps: 1
 gen_eval_every_x_batches: 500
-eval_metrics_every_x_batches: 500
+eval_metrics_every_x_batches: 2000
 save_model_epochs: 2
 push_to_hub: false
 hub_model_id: "None"

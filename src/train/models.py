@@ -125,11 +125,11 @@ def load_class_diffusion_model_large(image_size, context_size):
       sample_size=image_size,  # the target image resolution
       in_channels=1,  # the number of input channels, 3 for RGB images
       out_channels=1,  # the number of output channels
-      layers_per_block=3,  # how many ResNet layers to use per UNet block
-      block_out_channels=(128, 256, 512, 512, 1024, 1024),
+      layers_per_block=2,
+      block_out_channels=(128, 256, 256, 512, 512, 1024),
       down_block_types=(
           "DownBlock2D",
-          "AttnDownBlock2D",
+          "DownBlock2D",
           "DownBlock2D",
           "AttnDownBlock2D",
           "AttnDownBlock2D",
@@ -138,9 +138,9 @@ def load_class_diffusion_model_large(image_size, context_size):
       up_block_types=(
           "UpBlock2D",
           "AttnUpBlock2D",
+          "AttnUpBlock2D",
           "UpBlock2D",
-          "AttnUpBlock2D",
-          "AttnUpBlock2D",
+          "UpBlock2D",
           "UpBlock2D",
       ),
       class_embed_type="identity"
@@ -152,11 +152,11 @@ def load_input_diffusion_model_large(image_size, context_size):
       sample_size=image_size,
       in_channels=1 + context_size,  # Adjusted based on input features
       out_channels=1,
-      layers_per_block=3,
-      block_out_channels=(128, 256, 512, 512, 1024, 1024),
+      layers_per_block=2,
+      block_out_channels=(128, 256, 256, 512, 512, 1024),
       down_block_types=(
           "DownBlock2D",
-          "AttnDownBlock2D",
+          "DownBlock2D",
           "DownBlock2D",
           "AttnDownBlock2D",
           "AttnDownBlock2D",
@@ -165,9 +165,9 @@ def load_input_diffusion_model_large(image_size, context_size):
       up_block_types=(
           "UpBlock2D",
           "AttnUpBlock2D",
+          "AttnUpBlock2D",
           "UpBlock2D",
-          "AttnUpBlock2D",
-          "AttnUpBlock2D",
+          "UpBlock2D",
           "UpBlock2D",
       )
   )
