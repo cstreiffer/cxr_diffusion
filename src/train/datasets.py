@@ -27,12 +27,16 @@ class CXRDiffusionDataset(Dataset):
         label_cols,
         downsample_size=224,
         age_stats=None,
+        cont_feat_labels=[],
+        norm_cont_feat=False,
+        cont_feat_stats=None,
         train=False,
     ):
         self.metadata = pd.read_csv(metadata_df_path)
         self.label_cols = label_cols
         self.train = train
         self.age_stats = age_stats
+        self.cont_feats_stats = cont_feats_stats
         self.downsample_size = downsample_size
 
         # Create the transform
@@ -51,6 +55,23 @@ class CXRDiffusionDataset(Dataset):
             self.metadata["age"] = (self.metadata["age"] - age_stats[0]) / np.sqrt(
                 age_stats[1]
             )
+
+        # Normalize the feats
+        if norm_cont_feat:
+            # Use them to update
+            if cont_feat_stats is None:
+                cont_feat_stats = {}
+                for feat in cont_feat_labels:
+                    mean = self.metadata[feat].mean()
+                    var = self.metadata[feat].var()
+                    self.metadata[feat] = (self.metadata[feat] - mean) / np.sqrt(var)
+                    cont_feat_stats[feat] = [mean, var]
+                self.cont_feat_stats = cont_feat_stats
+            else:
+                for feat in cont_feat_labels:
+                    self.metadata[feat] = (self.metadata[feat] - cont_feat_stats[feat][0]) / np.sqrt(
+                        cont_feat_stats[feat][1]
+                    )
 
     def __len__(self):
         return len(set(self.metadata.index))

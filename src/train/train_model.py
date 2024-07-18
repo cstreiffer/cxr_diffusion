@@ -163,7 +163,7 @@ def train_model(
         return x, clean_images, loss.item()
 
     # Now let's iterate
-    global_step = 1
+    global_step = 0
     all_stats = {
         "train_loss": [],
         "train_epoch_loss": [],
@@ -188,7 +188,6 @@ def train_model(
             display_stats["B - Avg Loss"] = np.mean(all_stats["train_loss"][-1000:])
             display_stats["G - Global Step"] = global_step
             display_stats["F - LR"] = lr_scheduler.get_last_lr()[0]
-            global_step += 1
 
             # Now determine if we should eval
             if global_step % args.eval_metrics_every_x_batches == 0:
@@ -208,7 +207,7 @@ def train_model(
                 display_stats["E - Gen Eval Loss"] = gen_eval_loss
 
             # Increment the global_step
-
+            global_step += 1
             progress_bar.set_postfix(**display_stats)
             accelerator.log(display_stats, step=global_step)
 
@@ -221,7 +220,7 @@ def train_model(
 
                 # Save the model with the latest eval
                 eval_loss, mean_eval_loss, total_eval_loss = eval_full()
-                checkpoint_filename = f'{models_dir}/diffusion_checkpoint_epoch_{epoch}_{datetime.now().strftime("%Y-%m-%d")}_loss={mean_eval_loss}.pth'
+                checkpoint_filename = f'{models_dir}/diffusion_checkpoint_epoch_{epoch}_{datetime.now().strftime("%Y-%m-%d")}_loss={mean_eval_loss:.4f}.pth'
                 torch.save({
                   'epoch': epoch,
                   'model_state_dict': model.state_dict(),

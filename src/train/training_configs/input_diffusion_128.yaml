@@ -15,26 +15,31 @@ dataset_settings:
   - lvidd
   downsample_size: 128
   train: true
+  norm_cont_feat: true
+  cont_feat_labels:
+    - ivsd
+    - lvpwd
+    - lvidd
 metadata_df_paths:
   train_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_train.csv
   eval_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_test.csv
   test_metadata_path: drive/MyDrive/cxr/data/metadata/clean/inf_metadata_eval.csv
 num_feats: 8
-batch_size: 128
+batch_size: 32
 gen_eval_batch_size: 16
 num_epochs: 10
 loss_fn: mse_p
 optimizer: adamw
 optimizer_kwargs:
-  lr: 0.0005
-lr_warmup_steps: 200
+  lr: 0.0001
+lr_warmup_steps: 1000
 noise_scheduler_kwargs:
   num_train_timesteps: 1000
   beta_schedule: "squaredcos_cap_v2"
 cuda_idx: 0
 accumulate_grads_every_x_steps: 1
-gen_eval_every_x_batches: 100
-eval_metrics_every_x_batches: 50
+gen_eval_every_x_batches: 500
+eval_metrics_every_x_batches: 500
 save_model_epochs: 2
 push_to_hub: false
 hub_model_id: "None"

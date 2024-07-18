@@ -5,11 +5,7 @@ from datasets import (
     CXRDiffusionDataset,
     collate_cxr
 )
-from models import (
-    load_input_diffusion_model,
-    load_class_diffusion_model,
-    load_basic_diffusion_model
-)
+from models import load_model
 from loss import (
     perceptual_loss
 )
@@ -65,8 +61,13 @@ def run(args):
         dataset_train.age_mean,
         dataset_train.age_var,
     )
+    # Set the cont_feat_stats
+    args.eval_dataset_settings["cont_feat_stats"] = dataset_train.cont_feat_stats
+    args.test_dataset_settings["cont_feat_stats"] = dataset_train.cont_feat_stats
+    
     dataset_eval = dset_class(**args.eval_dataset_settings)
-    # dataset_test = dset_class(**args.test_dataset_settings)
+    dataset_test = dset_class(**args.test_dataset_settings) # Not currently used
+
     dataloader_train = DataLoader(
         dataset_train,
         args.batch_size,
@@ -95,13 +96,7 @@ def run(args):
     )
 
     # Load the model
-    model = None
-    if args.model_name == "basic_diffusion":
-        model = load_basic_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
-    elif args.model_name == "class_diffusion":
-        model = load_class_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
-    elif args.model_name == "input_diffusion":
-        model = load_input_diffusion_model(args.dataset_settings['downsample_size'], args.num_feats)
+    model = load_model(args.model_name, args.dataset_settings['downsample_size'], args.num_feats)
 
     # Place the model
     model = model.to(device)

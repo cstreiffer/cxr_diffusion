@@ -120,6 +120,58 @@ def load_class_diffusion_model(image_size, context_size):
   )
   return ClassConditionedUnet(model, context_size, n_channels=128)
 
+def load_class_diffusion_model_large(image_size, context_size):
+  model = UNet2DModel(
+      sample_size=image_size,  # the target image resolution
+      in_channels=1,  # the number of input channels, 3 for RGB images
+      out_channels=1,  # the number of output channels
+      layers_per_block=3,  # how many ResNet layers to use per UNet block
+      block_out_channels=(128, 256, 512, 512, 1024, 1024),
+      down_block_types=(
+          "DownBlock2D",
+          "AttnDownBlock2D",
+          "DownBlock2D",
+          "AttnDownBlock2D",
+          "AttnDownBlock2D",
+          "DownBlock2D",
+      ),
+      up_block_types=(
+          "UpBlock2D",
+          "AttnUpBlock2D",
+          "UpBlock2D",
+          "AttnUpBlock2D",
+          "AttnUpBlock2D",
+          "UpBlock2D",
+      )      class_embed_type="identity"
+  )
+  return ClassConditionedUnet(model, context_size, n_channels=128)
+
+def load_input_diffusion_model_large(image_size, context_size):
+  model = UNet2DModel(
+      sample_size=image_size,
+      in_channels=1 + context_size,  # Adjusted based on input features
+      out_channels=1,
+      layers_per_block=3,
+      block_out_channels=(128, 256, 512, 512, 1024, 1024),
+      down_block_types=(
+          "DownBlock2D",
+          "AttnDownBlock2D",
+          "DownBlock2D",
+          "AttnDownBlock2D",
+          "AttnDownBlock2D",
+          "DownBlock2D",
+      ),
+      up_block_types=(
+          "UpBlock2D",
+          "AttnUpBlock2D",
+          "UpBlock2D",
+          "AttnUpBlock2D",
+          "AttnUpBlock2D",
+          "UpBlock2D",
+      )
+  )
+  return InputConditionedUnet(model)
+
 def load_input_diffusion_model(image_size, context_size):
   model = UNet2DModel(
       sample_size=image_size,  # the target image resolution
@@ -146,6 +198,17 @@ def load_input_diffusion_model(image_size, context_size):
   )
   return InputConditionedUnet(model)
 
+# Load the model
+class_mapping = {
+  "basic_diffusion":       load_basic_diffusion_model,
+  "input_diffusion":       load_input_diffusion_model,
+  "input_diffusion_large": load_input_diffusion_model_large,
+  "class_diffusion":       load_class_diffusion_model,
+  "class_diffusion_large": load_class_diffusion_model_large
+}
+def load_model(name, image_size, context_size):
+  return class_mapping[name](image_size, context_size)
+
 # Load the model state
 def load_model_state(model, path, optimizer=None):
   checkpoint = torch.load(path)
@@ -160,17 +223,12 @@ def load_model_state(model, path, optimizer=None):
 import os
 import glob
 from diffusers import DDPMScheduler
-def load_pipeline(model_input_dir, model_type, image_size, epoch=None, context_size=0):
+def load_pipeline(model_input_dir, model_name, image_size, context_size, epoch=None):
   # 1. Create the scheduler
   noise_scheduler = DDPMScheduler(num_train_timesteps=1000, beta_schedule="squaredcos_cap_v2")
 
   # 2. Create the model
-  if model_type == 'basic_diffusion':
-    model = load_basic_diffusion_model(image_size, context_size)
-  elif model_type == 'class_diffusion':
-    model = load_class_diffusion_model(image_size, context_size)
-  elif model_type == 'input_diffusion':
-    model = load_input_diffusion_model(image_size, context_size)
+  model = load_model(model_type, image_size, context_size)
 
   # 3. Find the correct model
   files = glob.glob(os.path.join(model_input_dir, "models_pth", "*.pth"))
