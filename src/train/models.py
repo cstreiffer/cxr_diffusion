@@ -1,6 +1,8 @@
 import torch
 from torch import nn
-from diffusers import UNet2DModel, UNet2DConditionModel
+from diffusers import UNet2DModel, UNet2DConditionModel, DDPMScheduler
+import os
+import glob
 
 class StateEmbedding(nn.Module):
     def __init__(self, n_state, out_channels):
@@ -211,28 +213,32 @@ def load_model(name, image_size, context_size):
   return class_mapping[name](image_size, context_size)
 
 # Load the model state
+def get_device():
+  return "cuda" if torch.cuda.is_available() else "cpu"
+
 def load_model_state(model, path, optimizer=None):
-  checkpoint = torch.load(path)
+  checkpoint = torch.load(path, map_location=torch.device(get_device()))
+
   model.load_state_dict(checkpoint['model_state_dict'])
   if optimizer:
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-  epoch = checkpoint['epoch']
-  loss = checkpoint['loss']
-  return epoch, loss
 
-# Load the model/pipeline
-import os
-import glob
-from diffusers import DDPMScheduler
-def load_pipeline(model_input_dir, model_name, image_size, context_size, epoch=None):
+def load_pipeline(model_path, epoch=None):
+  # 0. Load stats/args
+  stats_path = os.path.join(model_path, "models_pth", "diffusion_checkpoint_stats.pth")
+  model_stats = torch.load(stats_path)
+
   # 1. Create the scheduler
   noise_scheduler = DDPMScheduler(num_train_timesteps=1000, beta_schedule="squaredcos_cap_v2")
 
   # 2. Create the model
-  model = load_model(model_type, image_size, context_size)
+  model_name = model_stats['args'].model_name
+  image_size = model_stats['args'].dataset_settings['downsample_size']
+  context_size = model_stats['args'].num_feats
+  model = load_model(model_name, image_size, context_size)
 
   # 3. Find the correct model
-  files = glob.glob(os.path.join(model_input_dir, "models_pth", "*.pth"))
+  files = glob.glob(os.path.join(model_path, "models_pth", "diffusion_checkpoint_epoch*"))
   if epoch is None:
     epoch = max([int(os.path.basename(n).split('_')[3]) for n in files])
 
@@ -241,10 +247,10 @@ def load_pipeline(model_input_dir, model_name, image_size, context_size, epoch=N
   print(f"Loaded {file}")
   
   # Now load
-  _, _ = load_model_state(model, file)
+  load_model_state(model, file)
 
   # Now return
-  return model, noise_scheduler
+  return model, noise_scheduler, model_stats
 
 # Model Other - Not used
 # class_embed_type="projection"
