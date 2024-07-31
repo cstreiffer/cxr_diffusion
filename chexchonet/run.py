@@ -201,7 +201,7 @@ def run(args):
 
   return metrics
 
-def main(file_path, train_file_path, eval_file_path, name):
+def main(file_path, train_file_path, test_file_path, name):
     with open(file_path, "r") as config_file:
         config_dict = yaml.safe_load(config_file)
 
@@ -211,10 +211,12 @@ def main(file_path, train_file_path, eval_file_path, name):
 
     # Adjust 
     config_dict['metadata_df_paths']['train_metadata_path'] = train_file_path
-    config_dict['metadata_df_paths']['eval_metadata_path']  = eval_file_path
+    config_dict['metadata_df_paths']['test_metadata_path']  = test_file_path
     config_dict['visdom_run_name'] = name
+    import json
+    print(json.dumps(config_dict, indent=2))
 
     # Now convert
     args = Namespace(**config_dict)
 
-    main(args)
+    run(args)
