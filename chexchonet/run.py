@@ -213,8 +213,6 @@ def main(file_path, train_file_path, test_file_path, name):
     config_dict['metadata_df_paths']['train_metadata_path'] = train_file_path
     config_dict['metadata_df_paths']['test_metadata_path']  = test_file_path
     config_dict['visdom_run_name'] = name
-    import json
-    print(json.dumps(config_dict, indent=2))
 
     # Now convert
     args = Namespace(**config_dict)

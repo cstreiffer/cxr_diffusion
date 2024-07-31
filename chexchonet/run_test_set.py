@@ -22,6 +22,7 @@ from setup_metrics import (
 from pathlib import Path
 import os
 import sys
+import re
 from helpers import VisdomLinePlotter, bootstrap_estimates
 
 sys.path.insert(0, "../model/")
@@ -35,6 +36,27 @@ import numpy as np
 from datasets import CXRDataset, collate_cxr, StanfordCXRDataset
 from torch.utils.data import DataLoader
 
+def find_best_checkpoint(directory, epoch=None):
+    best_loss = float('inf')
+    best_file = None
+
+    # Compile regex pattern to extract epoch and loss from filename
+    pattern = re.compile(r"best_checkpoint_(\d+)_val_loss=(-?\d+\.\d+).pt")
+
+    for filename in os.listdir(directory):
+        match = pattern.search(filename)
+        if match:
+            file_epoch = int(match.group(1))
+            file_loss = abs(float(match.group(2)))
+
+            # Check if specific epoch is requested and matches, or if no epoch is specified
+            if (epoch is not None and file_epoch == epoch) or (epoch is None):
+                if file_loss < best_loss:
+                    best_loss = file_loss
+                    best_file = filename
+
+    print(f"Loading file {filename}")
+    return os.path.join(directory, best_file)
 
 def run_test_set(checkpoint_fp, test_set_settings_path, file_name=""):
 
