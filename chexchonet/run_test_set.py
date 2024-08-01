@@ -50,12 +50,12 @@ def find_best_checkpoint(directory, epoch=None):
             file_loss = abs(float(match.group(2)))
 
             # Check if specific epoch is requested and matches, or if no epoch is specified
-            if (epoch is not None and file_epoch == epoch) or (epoch is None):
+            if (epoch is not None and file_epoch >= epoch) or (epoch is None):
                 if file_loss < best_loss:
                     best_loss = file_loss
                     best_file = filename
 
-    print(f"Loading file {filename}")
+    print(f"Loading file {best_file}")
     return os.path.join(directory, best_file)
 
 def run_test_set(checkpoint_fp, test_set_settings_path, file_name=""):
@@ -341,9 +341,9 @@ def calculate_test_statistics(
 
         for i in range(len(class_to_name)):
             print(
-                "\n--------------------------------------------------------------------------------------------------"
+                "\n--------------------------------------------------------------------------------------------------\n"
                 "***TEST SET*** CLASS_NAME: {} ## AUROC: {} ({},{}) ## AUPRC: {} ({},{}) ## PREC: {} ## RECALL: {}"  ## FPR/TPR: ({}, {})"
-                "--------------------------------------------------------------------------------------------------\n".format(
+                "\n--------------------------------------------------------------------------------------------------\n".format(
                     class_to_name[i],
                     auroc[i],
                     roc_ci[i][0],

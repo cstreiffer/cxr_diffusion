@@ -48,7 +48,7 @@ input_size: 224
 model_kwargs:
   drop_rate: 0.3
 batch_size: 32
-num_epochs: 15
+num_epochs: 5
 optimizer: adam
 optimizer_kwargs:
   lr: 0.001
