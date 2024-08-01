@@ -282,6 +282,7 @@ def calculate_test_statistics(
         conf_matrix = []
         save_preds = []
         save_targets = []
+        thresh = []
         for i in range(num_classes):
             preds, targets = torch.cat(roc_auc_metric_test[i]._predictions), torch.cat(
                 roc_auc_metric_test[i]._targets
@@ -293,7 +294,7 @@ def calculate_test_statistics(
             precision, recall, thresholds = precision_recall_curve(targets, preds)
             f1_scores = 2 * recall * precision / (recall + precision)
             best_thresh = thresholds[np.argmax(f1_scores)]
-            print(best_thresh)
+            thresh.append(best_thresh)
 
             c_mat = confusion_matrix(targets, preds > 0.5)
             conf_matrix.append((c_mat, 0.5))
@@ -341,9 +342,7 @@ def calculate_test_statistics(
 
         for i in range(len(class_to_name)):
             print(
-                "\n--------------------------------------------------------------------------------------------------\n"
-                "***TEST SET*** CLASS_NAME: {} ## AUROC: {} ({},{}) ## AUPRC: {} ({},{}) ## PREC: {} ## RECALL: {}"  ## FPR/TPR: ({}, {})"
-                "\n--------------------------------------------------------------------------------------------------\n".format(
+                "CLASS_NAME: {} # AUROC: {:.4f} ({:.4f},{:.4f}) # AUPRC: {:.4f} ({:.4f},{:.4f}) # PREC: {:.4f} # RECALL: {:.4f} # THRESH: {.4f}".format(
                     class_to_name[i],
                     auroc[i],
                     roc_ci[i][0],
@@ -353,6 +352,7 @@ def calculate_test_statistics(
                     pr_ci[i][1],
                     prec[i],
                     rec[i],
+                    thresh[i]
                 )
             )
 

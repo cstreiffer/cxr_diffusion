@@ -57,6 +57,6 @@ use_lvhnet_pretrained: false
 use_auroc_loss: false
 ckpt_path: CheXchoNet/src/train/model_checkpoint/chexnet.pth.tar
 accumulate_grads_every_x_steps: 1
-train_metrics_every_x_batches: 100
-eval_metrics_every_x_batches: 50
+train_metrics_every_x_batches: 400
+eval_metrics_every_x_batches: 200
 demo_size: 3
