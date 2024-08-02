@@ -342,7 +342,7 @@ def calculate_test_statistics(
 
         for i in range(len(class_to_name)):
             print(
-                "CLASS_NAME: {} # AUROC: {:.4f} ({:.4f},{:.4f}) # AUPRC: {:.4f} ({:.4f},{:.4f}) # PREC: {:.4f} # RECALL: {:.4f} # THRESH: {.4f}".format(
+                "CLASS_NAME: {} # AUROC: {:.4f} ({:.4f},{:.4f}) # AUPRC: {:.4f} ({:.4f},{:.4f}) # PREC: {:.4f} # RECALL: {:.4f} # THRESH: {:.4f}".format(
                     class_to_name[i],
                     auroc[i],
                     roc_ci[i][0],

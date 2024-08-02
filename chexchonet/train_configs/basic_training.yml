@@ -51,7 +51,7 @@ batch_size: 32
 num_epochs: 10
 optimizer: adam
 optimizer_kwargs:
-  lr: 0.001
+  lr: 0.0005
 use_chexnet_pretrained: true
 use_lvhnet_pretrained: false
 use_auroc_loss: false
