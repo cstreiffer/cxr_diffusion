@@ -7,7 +7,6 @@ from diffusers.utils import make_image_grid
 from accelerate import Accelerator
 import numpy as np
 import pandas as pd
-from huggingface_hub import create_repo, upload_folder
 from tqdm.auto import tqdm
 from pathlib import Path
 from matplotlib import pyplot as plt
@@ -41,11 +40,6 @@ def train_model(
             os.makedirs(models_dir, exist_ok=True)
             samples_dir = os.path.join(model_output_path, "samples")
             os.makedirs(samples_dir, exist_ok=True)
-
-        if args.push_to_hub:
-            repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(model_output_path).name, exist_ok=True
-            ).repo_id
         accelerator.init_trackers("train_example")
 
     # Prepare the objects
