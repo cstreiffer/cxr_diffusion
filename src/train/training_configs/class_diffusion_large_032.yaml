@@ -8,8 +8,6 @@ dataset_settings:
   - age
   - sex_m
   - sex_f
-  - view_ap
-  - view_pa
   - ivsd
   - lvpwd
   - lvidd
@@ -24,7 +22,7 @@ metadata_df_paths:
   train_metadata_path: 
   eval_metadata_path: 
   test_metadata_path: 
-num_feats: 8
+num_feats: 6
 batch_size: 16
 gen_eval_batch_size: 16
 num_epochs: 20
@@ -40,6 +38,6 @@ cuda_idx: 0
 accumulate_grads_every_x_steps: 1
 gen_eval_every_x_batches: 2000
 eval_metrics_every_x_batches: 2000
-save_model_epochs: 2
+save_model_epochs: 1
 push_to_hub: false
 hub_model_id: "None"
