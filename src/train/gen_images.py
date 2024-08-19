@@ -6,7 +6,7 @@ from tqdm.auto import tqdm
 import os
 from datetime import datetime
 
-from models import get_device
+from models import get_device, load_pipeline
 
 def generate_image_batch(model, noise_scheduler, x, context):
     model.eval()
@@ -93,6 +93,10 @@ def gen(
   bs,
   sample_fn=None
 ):
+  # Create the output path
+  if not os.path.exists(output_path):
+    os.makedirs(output_path)
+
   # Format the date for the run
   run_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -105,7 +109,11 @@ def gen(
   # Create output paths
   os.makedirs(output_path, exist_ok=True)
   image_path = os.path.join(output_path, 'images')
-  csv_path   = os.path.join(output_path, 'stats.csv')
+  # Create the output path
+  if not os.path.exists(image_path):
+    os.makedirs(image_path)
+    
+  csv_path   = os.path.join(output_path, 'gen_metadata.csv')
   tot_data = []
 
   for i in range(num_batches):
@@ -139,8 +147,7 @@ def gen(
     file_paths = save_images(
         gen_images,
         image_path,
-        file_names=file_names,
-        format=format
+        file_names=file_names
     )
 
     # 4. Save recovered output features
