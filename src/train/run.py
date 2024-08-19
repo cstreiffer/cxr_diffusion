@@ -31,7 +31,7 @@ def run(args):
     # Define the output path
     model_output_path = os.path.join(
         args.model_output_path,
-        f'{args.model_name}_{args.dataset_settings["downsample_size"]}_{args.num_feats}_{datetime.now().strftime("%Y-%m-%d")}'
+        f'{args.model_name}_{args.dataset_settings["downsample_size"]}x{args.dataset_settings["downsample_size"]}'
     )
 
     # Load the datasets

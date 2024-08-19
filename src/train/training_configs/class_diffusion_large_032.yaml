@@ -1,5 +1,5 @@
 model_name: "class_diffusion_large"
-model_output_path: "drive/MyDrive/cxr/models/"
+model_output_path: 
 mixed_precision: "fp16"
 seed: 17
 dataset_settings:
